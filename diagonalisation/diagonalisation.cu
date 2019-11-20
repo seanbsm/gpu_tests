@@ -35,9 +35,6 @@
 /* Self-improvised QR algorithm */
 #include "QR_batch_function.cuh"
 
-/* Copied Jacobi kernel algorithm */
-#include "jacobi_kernel_function.cuh"
-
 /* Self-written Jacobi algorithm */
 #include "jacobi_kernel_function_new.cuh"
 
