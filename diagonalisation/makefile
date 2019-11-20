@@ -21,14 +21,17 @@ OBJFORT_FILES := $(SRCFORT_FILES:.f90=.o)
 
 
 #--default-stream per-thread
+#-I/usr/local/magma/include
 # Flags
+#~ MAGMAFLAGS := -DNDEBUG -DADD_ -I/usr/local/magma/include -I/include -I/home/sean/intel/compilers_and_libraries_2019.4.243/linux/mkl/include
 CUDAFLAGS := -O2 -Xcompiler -fPIC
 CPPFLAGS :=  -Wall -std=c++17 -O2 -DMKL_ILP64 -m64 -DMKL_Complex16="std::complex<double>" -DMKL_Complex8="std::complex<float>" -I$(MKLROOT)/include
 FORTFLAGS := -O2 -fdefault-real-8 -fdefault-double-8 -cpp -ffree-form -ffree-line-length-1000 -fPIC
 
 # Libraries
-CUDALIBS := -lcuda -lcudart -lcublas -lcusolver -L/usr/local/cuda/lib64
-LDLIBS := -L$(MKLROOT)/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl -lgfortran
+#~ MAGMALIBS := -L/usr/local/magma/lib -L/lib64 -L/home/sean/intel/compilers_and_libraries_2019.4.243/linux/mkl/lib/intel64 -lmagma_sparse -lmagma -fopenmp -lmkl_intel_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl -lgfortran -lcusparse -lcudadevrt
+CUDALIBS := -lcuda -lcudart -lcublas -lcusolver
+LDLIBS := -L$(MKLROOT)/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl -lgfortran 
 
 
 # Symbol explenations

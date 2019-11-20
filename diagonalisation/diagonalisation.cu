@@ -18,16 +18,31 @@
 #include <chrono>
 #include <ctime>
 
-#include "eigenFinder.h"
+/* Type definitions */
+#include "typeDefs.h"
 
+/* CUDA functions */
+#include "eigenFinder.h"
 #include "dsyevd_stream_functions.cuh"
 #include "dsyevj_stream_functions.cuh"
+//~ #include "geqrf_stream_functions.cuh"
 #include "dsyevj_batch_functions.cuh"
 #include "kernel_functions.cuh"
-#include "fill_matrices.cuh"
 
-//~ typedef float  floatType;
-typedef double floatType;
+/* MAGMA functions */
+//~ #include "magma_dsyev_batch_functions.cuh"
+
+/* Self-improvised QR algorithm */
+#include "QR_batch_function.cuh"
+
+/* Copied Jacobi kernel algorithm */
+#include "jacobi_kernel_function.cuh"
+
+/* Self-written Jacobi algorithm */
+#include "jacobi_kernel_function_new.cuh"
+
+/* Additional functions */
+#include "fill_matrices.cuh"
 
 void printMatrix(int m, int n, const floatType*A, const char* name){
 	for(int row = 0 ; row < m ; row++){
@@ -40,9 +55,13 @@ void printMatrix(int m, int n, const floatType*A, const char* name){
 
 int main(int argc, char*argv[]){
 	
-	const int N = 32;
+	if (argc != 3){
+		std::cout << "you need to input matrix size and number, respectively" << std::endl;
+	}
+	
+	const int N = atoi(argv[1]);
 	const int m = N;
-	const int batchSize = 254*4;
+	const int batchSize = atoi(argv[2]);
 
 	/* Declare host arrays */
 	floatType *A = new floatType [m*m*batchSize];
@@ -66,8 +85,11 @@ int main(int argc, char*argv[]){
 	 
 	/* Call diagonalisation routine of choice */
 	//~ double time_gpu = diagonalise_kernel(d_A, d_W, m, batchSize);
-	double time_gpu = diagonalise_stream_syevd(d_A, d_W, m, batchSize);
+	//~ double time_gpu = diagonalise_stream_syevd(d_A, d_W, m, batchSize);
 	//~ double time_gpu = diagonalise_stream_syevj(d_A, d_W, m, batchSize);
+	//~ double time_gpu = jacobi_kernels(d_A, d_W, m, batchSize);
+	double time_gpu = jacobi_kernels_parallel(d_A, d_W, m, batchSize);
+	//~ double time_gpu = diagonalise_batch_QR(d_A, d_W, m, batchSize);
 	//~ double time_gpu = diagonalise_batch_syevj(d_A, d_W, m, batchSize);
 	
 	std::cout<<"Time gpu: "<< time_gpu << " s" << std::endl;
@@ -75,7 +97,6 @@ int main(int argc, char*argv[]){
 	/* Code A and W from device */
 	cudaMemcpy(V, d_A, sizeof(floatType) * m * m * batchSize, cudaMemcpyDeviceToHost);
 	cudaMemcpy(W, d_W, sizeof(floatType) * m * batchSize      , cudaMemcpyDeviceToHost);
-	
 	
 	/* CPU BENCHMARKING */
 	/* Symmetric matrix size */
@@ -106,12 +127,9 @@ int main(int argc, char*argv[]){
 	
 	std::cout<<"Time cpu: "<< time_cpu << " s" << std::endl;
 	
-	//~ for (int M=0; M<batchSize; M++){
-		//~ for (int i=0; i<m; i++){
-			//~ for (int j=0; j<m; j++){
-				//~ std::cout << V_CPU[M*m*m + i*m+j] << std::endl;
-			//~ }
-		//~ }
+	//~ std::cout << std::endl;
+	//~ for (int i=0; i<m; i++){
+		//~ std::cout << W[i] << std::endl;
 	//~ }
 	
 	/* Print any numerically big differences in eigenvalues between GPU and CPU*/
