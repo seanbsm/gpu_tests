@@ -115,15 +115,12 @@ def Jacobi_parallel_algo(A, n):
 	while offDiag(A,n)>eps and it<=maxIter:
 		it += 1
 		for sets in xrange(n-1):	# Independent rotational set (determines top and bot sets)
-			print " " 
 			# ~ start = time.time()
 			for k in xrange(n/2):	# Loop through sets, this can be parallellised
 				p = min(top[k], bot[k])
 				q = max(top[k], bot[k])
 				
 				c, s = sym_Schur2(A, p, q)
-				
-				print c,s
 				
 				# Make Jacobi rotation matrix
 				J = np.identity(n)
@@ -182,8 +179,8 @@ def Jacobi_parallel_algo(A, n):
 	eigvals = np.diag(A)
 	sort = np.argsort(eigvals)
 	
-	# ~ return (eigvals[sort]), V[:,sort]
-	return np.diag(A), V
+	return (eigvals[sort]), V[:,sort]
+	# ~ return np.diag(A), V
 
 def make_mat(n):
 	A = np.zeros(shape=(n,n))
@@ -196,7 +193,7 @@ def make_mat(n):
 def make_mat_example():
 	return np.matrix([[1,1,1,1], [1,2,3,4], [1,3,6,10], [1,4,10,20]]) 
 
-N = 6
+N = 46
 mat = make_mat(N)
 mat_NP = make_mat(N)
 
@@ -215,13 +212,21 @@ eigVals_NP, eigVecs_NP = np.linalg.eigh(mat_NP)
 end = time.time()
 time_NP = end - start
 
+max_val = 0
+
 print "\n"
 for i in xrange(N):
-	print eigVals[i]
-	# ~ print eigVals_NP[i]
+	
+	max_val_i = abs(eigVals_NP[i] - eigVals[i])
+	if max_val_i > max_val:
+		max_val = max_val_i
+	
+	# ~ print eigVals[i]
+	# ~ print eigVals_NP[i], "\n"
+	
 	# ~ print "\n",eigVecs[i]
 	# ~ print eigVecs_NP[i]
-
+print max_val
 
 print "\nTimes:" 
 print "My routine:", time_custom

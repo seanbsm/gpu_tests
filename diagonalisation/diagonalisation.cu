@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <algorithm>
 
 #include <cuda_runtime.h>
 #include <cusolverDn.h>
@@ -124,18 +125,37 @@ int main(int argc, char*argv[]){
 	
 	std::cout<<"Time cpu: "<< time_cpu << " s" << std::endl;
 	
-	//~ std::cout << std::endl;
-	//~ for (int i=0; i<m; i++){
-		//~ std::cout << W[i] << std::endl;
+	//~ if (N <=6){
+		//~ for (int i=0; i<m; i++){
+			//~ std::cout << std::endl;
+			//~ std::cout << "E: " << W[i] << std::endl;
+			//~ for (int j=0; j<m; j++){
+				//~ std::cout << V[i*m+j] << std::endl;
+			//~ }
+		//~ }
 	//~ }
 	
 	/* Print any numerically big differences in eigenvalues between GPU and CPU*/
 	floatType maxDiff = 0;
+	int max_h, max_i;
 	for (int M=0; M<batchSize; M++){
+		
+		std::vector<floatType> eigenVals_gpu (m);
 		for (int i=0; i<m; i++){
-			floatType diff = abs(W_CPU[M*m + i] - W[M*m + i]);
+			eigenVals_gpu[i] = W[M*m + i];
+		}
+		std::sort(eigenVals_gpu.begin(), eigenVals_gpu.end());
+		
+		for (int i=0; i<m; i++){
+		
+			//~ std::cout << M << " " << i << " " << eigenVals_gpu[i] << std::endl;
+			//~ std::cout << M << " " << i << " " << W_CPU[M*m+i] << "\n" << std::endl;
+			
+			floatType diff = abs(W_CPU[M*m + i] - eigenVals_gpu[i]);
 			if (diff > maxDiff){
 				maxDiff = diff;
+				max_h = M;
+				max_i = i;
 				//~ std::cout << M << " " << i << " " << diff << std::endl;
 			}
 		}
@@ -143,6 +163,7 @@ int main(int argc, char*argv[]){
 	
 	std::cout << std::endl;
 	std::cout << "Max diff: " << maxDiff << std::endl;
+	std::cout << "h: " << max_h << " i: " << max_i << std::endl; 
 
 	/* free resources */
 	if (d_A) cudaFree(d_A);

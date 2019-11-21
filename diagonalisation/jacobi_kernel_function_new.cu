@@ -1,15 +1,30 @@
 
 #include "jacobi_kernel_function_new.cuh"
 
-/* Symmetric 2-by-2 Schur Decomposition */
-__device__
-void sym_Schur2(floatType *A, floatType *c, floatType *s, int p, int q, int n){
+/* Symmetric 2-by-2 Schur decomposition */
+__global__
+void sym_Schur2_all(floatType *d_A, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
 	
-	floatType tau = 0;
-	floatType t   = 0;
+	int h = blockIdx.x;
+	int k = threadIdx.x;
 	
-	if ( A[n*p + q]!=0. ){
-		tau = (A[n*q + q] - A[n*p + p]) / (2.*A[n*p + q]);
+	floatType *A = &d_A[h*n*n];
+	floatType *C = &d_c[h*n/2];
+	floatType *S = &d_s[h*n/2];
+	
+	int tk = d_top[k];
+	int bk = d_bot[k];
+	int p = (tk<bk)*tk + (tk>bk)*bk;
+	int q = (tk>bk)*tk + (tk<bk)*bk;
+	
+	floatType tau, t, c, s, Apq, App, Aqq;
+	
+	Apq = A[n*p + q];
+	App = A[n*p + p];
+	Aqq = A[n*q + q];
+	
+	if ( Apq!=0 ){
+		tau = (Aqq - App) / (2.*Apq);
 		
 		if (tau>=0){
 			t =  1. / (tau + sqrt(1+tau*tau));
@@ -18,32 +33,16 @@ void sym_Schur2(floatType *A, floatType *c, floatType *s, int p, int q, int n){
 			t = -1. / (-tau + sqrt(1+tau*tau));
 		}
 		
-		*c = 1 / sqrt(1+t*t);
-		*s = t*(*c);
+		c = 1. / sqrt(1+t*t);
+		s = t*c;
 	}
 	else{
-		*c = 1;
-		*s = 0;
+		c = 1;
+		s = 0;
 	}
-}
-
-/* Symmetric 2-by-2 Schur Decomposition */
-__global__
-void sym_Schur2_all(floatType *d_A, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
 	
-	int h = blockIdx.x;
-	int k = threadIdx.x;
-	
-	floatType *A = &d_A[h*n*n];
-	floatType *c = &d_c[k + h*n/2];
-	floatType *s = &d_s[k + h*n/2];
-	
-	int tk = d_top[k];
-	int bk = d_bot[k];
-	int p = (tk<bk)*tk + (tk>bk)*bk;
-	int q = (tk>bk)*tk + (tk<bk)*bk;
-	
-	sym_Schur2(A, c, s, p, q, n);
+	C[k] = c;
+	S[k] = s;
 }
 
 __global__
@@ -57,6 +56,7 @@ void Jacobi_parallel_row_rot(floatType *d_A, floatType *d_V, floatType *d_c, flo
 	
 	/* Only usage of h and k */
 	floatType *A = &d_A[h*n*n];
+	floatType *V = &d_V[h*n*n];
 	int tk 		 = d_top[k];
 	int bk 		 = d_bot[k];
 	
@@ -101,30 +101,42 @@ void Jacobi_parallel_row_rot(floatType *d_A, floatType *d_V, floatType *d_c, flo
 		A[n*p + i] = c*Api - s*Aqi;
 		A[n*q + i] = c*Aqi + s*Api;
 	}
-	
-	//~ /* Update A
-	 //~ * 3 loops are actually slower than the if-test for many small matrices */
-	//~ for (int i=0; i<n; i++){
-		//~ if (i!=p && i!=q){
-			//~ Api = A[n*p + i];
-			//~ Aqi = A[n*q + i];
-			
-			//~ A[n*p + i] = c*Api - s*Aqi;
-			//~ A[n*q + i] = c*Aqi + s*Api;
-		//~ }
-	//~ }
-	
-	//~ App = A[n*p + p];
-	//~ Apq = A[n*p + q];
-	//~ Aqp = A[n*q + p];
-	//~ Aqq = A[n*q + q];
-	
-	//~ A[n*p + p] = c*c*App - c*s*(Apq + Aqp) + s*s*Aqq;
-	//~ A[n*q + q] = s*s*App + c*s*(Apq + Aqp) + c*c*Aqq;
-	
-	//~ A[n*p + q] = 0;
-	//~ A[n*q + p] = 0;
 }
+
+
+__global__
+void Jacobi_parallel_vec_rot(floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
+	int h = blockIdx.x;
+	int K = threadIdx.x;
+	
+	int k = K / n;
+	int i = K % n;
+	
+	/* Only usage of h and k */
+	floatType *V = &d_V[h*n*n];
+	int tk 		 = d_top[k];
+	int bk 		 = d_bot[k];
+	
+	floatType *c_set  = &d_c[h*n/2];
+	floatType *s_set  = &d_s[h*n/2];
+	floatType c = c_set[k];
+	floatType s = s_set[k];
+	
+	/* Set p to the smallest of tk and bk */
+	int p = (tk<bk)*tk + (tk>bk)*bk;
+	
+	/* Set q to the largest of tk and bk */
+	int q = (tk>bk)*tk + (tk<bk)*bk;
+	
+	floatType Viq, Vip;
+	
+	Vip = V[i*n + p];
+	Viq = V[i*n + q];
+	
+	V[i*n + p] = c*Vip - s*Viq;
+	V[i*n + q] = c*Viq + s*Vip;
+}
+
 
 __global__
 void Jacobi_parallel_col_rot(floatType *d_A, floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
@@ -248,8 +260,17 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 	cudaMalloc( (void**)&d_c,  batchSize*m_half*sizeof(floatType) );
 	cudaMalloc( (void**)&d_s,  batchSize*m_half*sizeof(floatType) );
 	
+	
 	floatType *d_V = NULL;
 	cudaMalloc( (void**)&d_V,  batchSize*m*m*sizeof(floatType) );
+	
+	floatType V [m*m*batchSize];
+	for (int h=0; h<batchSize; h++){
+		for (int i=0; i<m; i++){
+			V[h*m*m + i*m + i] = 1;
+		}
+	}
+	cudaMemcpy(d_V, V, sizeof(floatType) * m*m*batchSize, cudaMemcpyHostToDevice);
 	
 	cudaEvent_t start, stop;
 	cudaEventCreate(&start);
@@ -264,13 +285,10 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 			/* Calculate all rotation angles before we start rotating */
 			sym_Schur2_all<<<nBlocks, nThreads>>>(d_A, d_c, d_s, d_top, d_bot, m);
 			
-			//~ for (int k=0; k<nThreads; k++){
-				//~ Jacobi_parallel_algo<<<nBlocks, 1>>>(d_A, d_V, d_c, d_s, &d_top[k], &d_bot[k], m);
-			//~ }
-			
 			Jacobi_parallel_row_rot<<<nBlocks, nThreads * (m-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
 			Jacobi_parallel_col_rot<<<nBlocks, nThreads*(nThreads-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
 			
+			Jacobi_parallel_vec_rot<<<nBlocks, nThreads*m>>>(d_V, d_c, d_s, d_top, d_bot, m);
 			
 			rotational_sets_copy<<<1, nThreads>>>(d_top_temp, d_bot_temp, d_top, d_bot);
 			rotational_sets<<<1, nThreads>>>(d_top, d_bot, d_top_temp, d_bot_temp, m);
@@ -283,7 +301,6 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 	cudaEventElapsedTime(&time, start, stop);
 	
 	floatType A [m*m*batchSize];
-	floatType V [m*m*batchSize];
 	floatType W [m*batchSize];
 	
 	cudaMemcpy(A, d_A, sizeof(floatType) * m*m*batchSize, cudaMemcpyDeviceToHost);
