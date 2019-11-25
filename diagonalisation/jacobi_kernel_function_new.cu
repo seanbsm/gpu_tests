@@ -47,12 +47,15 @@ void sym_Schur2_all(floatType *d_A, floatType *d_c, floatType *d_s, int *d_top, 
 
 __global__
 void Jacobi_parallel_row_rot(floatType *d_A, floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
+	int H = blockIdx.x;
+	int i = threadIdx.x;
+	int h = H / (n/2);
+	int k = H % (n/2);
 	
-	int h = blockIdx.x;
-	int K = threadIdx.x;
-	
-	int k = K / (n-1);
-	int i = K % (n-1);
+	//~ int h = blockIdx.x;
+	//~ int K = threadIdx.x;
+	//~ int k = K / (n-1);
+	//~ int i = K % (n-1);
 	
 	/* Only usage of h and k */
 	floatType *A = &d_A[h*n*n];
@@ -103,48 +106,18 @@ void Jacobi_parallel_row_rot(floatType *d_A, floatType *d_V, floatType *d_c, flo
 	}
 }
 
-
-__global__
-void Jacobi_parallel_vec_rot(floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
-	int h = blockIdx.x;
-	int K = threadIdx.x;
-	
-	int k = K / n;
-	int i = K % n;
-	
-	/* Only usage of h and k */
-	floatType *V = &d_V[h*n*n];
-	int tk 		 = d_top[k];
-	int bk 		 = d_bot[k];
-	
-	floatType *c_set  = &d_c[h*n/2];
-	floatType *s_set  = &d_s[h*n/2];
-	floatType c = c_set[k];
-	floatType s = s_set[k];
-	
-	/* Set p to the smallest of tk and bk */
-	int p = (tk<bk)*tk + (tk>bk)*bk;
-	
-	/* Set q to the largest of tk and bk */
-	int q = (tk>bk)*tk + (tk<bk)*bk;
-	
-	floatType Viq, Vip;
-	
-	Vip = V[i*n + p];
-	Viq = V[i*n + q];
-	
-	V[i*n + p] = c*Vip - s*Viq;
-	V[i*n + q] = c*Viq + s*Vip;
-}
-
-
 __global__
 void Jacobi_parallel_col_rot(floatType *d_A, floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
-	int h = blockIdx.x;
-	int K = threadIdx.x;
 	
-	int k = K / (n/2 - 1);
-	int i = K % (n/2 - 1);
+	int H = blockIdx.x;
+	int i = threadIdx.x;
+	int h = H / (n/2);
+	int k = H % (n/2);
+	
+	//~ int h = blockIdx.x;
+	//~ int K = threadIdx.x;
+	//~ int k = K / (n/2 - 1);
+	//~ int i = K % (n/2 - 1);
 	
 	if (i>=k){
 		i += 1;
@@ -183,6 +156,39 @@ void Jacobi_parallel_col_rot(floatType *d_A, floatType *d_V, floatType *d_c, flo
 	
 	A[n*p + q_i] = c*Ap_qi + s*Ap_pi;
 	A[n*q + q_i] = c*Aq_qi + s*Aq_pi;
+}
+
+__global__
+void Jacobi_parallel_vec_rot(floatType *d_V, floatType *d_c, floatType *d_s, int *d_top, int *d_bot, int n){
+	int h = blockIdx.x;
+	int K = threadIdx.x;
+	
+	int k = K / n;
+	int i = K % n;
+	
+	/* Only usage of h and k */
+	floatType *V = &d_V[h*n*n];
+	int tk 		 = d_top[k];
+	int bk 		 = d_bot[k];
+	
+	floatType *c_set  = &d_c[h*n/2];
+	floatType *s_set  = &d_s[h*n/2];
+	floatType c = c_set[k];
+	floatType s = s_set[k];
+	
+	/* Set p to the smallest of tk and bk */
+	int p = (tk<bk)*tk + (tk>bk)*bk;
+	
+	/* Set q to the largest of tk and bk */
+	int q = (tk>bk)*tk + (tk<bk)*bk;
+	
+	floatType Viq, Vip;
+	
+	Vip = V[i*n + p];
+	Viq = V[i*n + q];
+	
+	V[i*n + p] = c*Vip - s*Viq;
+	V[i*n + q] = c*Viq + s*Vip;
 }
 
 __global__
@@ -277,6 +283,18 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 	cudaEventCreate(&stop);
 	cudaEventRecord(start, 0);
 	
+	int newBlocks_row  = batchSize*nThreads;
+	int newBlocks_col  = batchSize*nThreads;
+	int newThreads_row = m-1;
+	int newThreads_col = m/2 - 1;
+	
+	std::cout << "Row blocks:  " << newBlocks_row << std::endl;
+	std::cout << "Row threads: " << newThreads_row << std::endl;
+	
+	std::cout << "Col blocks:  " << newBlocks_col << std::endl;
+	std::cout << "Col threads: " << newThreads_col << std::endl;
+	
+	
 	/* Loop over number of rotations */
 	for (int iter=0; iter<maxIter; iter++){
 		
@@ -285,10 +303,13 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 			/* Calculate all rotation angles before we start rotating */
 			sym_Schur2_all<<<nBlocks, nThreads>>>(d_A, d_c, d_s, d_top, d_bot, m);
 			
-			Jacobi_parallel_row_rot<<<nBlocks, nThreads * (m-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
-			Jacobi_parallel_col_rot<<<nBlocks, nThreads*(nThreads-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
+			Jacobi_parallel_row_rot<<<newBlocks_row, newThreads_row>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
+			//~ Jacobi_parallel_row_rot<<<nBlocks, nThreads * (m-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
 			
-			Jacobi_parallel_vec_rot<<<nBlocks, nThreads*m>>>(d_V, d_c, d_s, d_top, d_bot, m);
+			Jacobi_parallel_col_rot<<<newBlocks_col, newThreads_col>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
+			//~ Jacobi_parallel_col_rot<<<nBlocks, nThreads*(nThreads-1)>>>(d_A, d_V, d_c, d_s, d_top, d_bot, m);
+			
+			//~ Jacobi_parallel_vec_rot<<<nBlocks, nThreads*m>>>(d_V, d_c, d_s, d_top, d_bot, m);
 			
 			rotational_sets_copy<<<1, nThreads>>>(d_top_temp, d_bot_temp, d_top, d_bot);
 			rotational_sets<<<1, nThreads>>>(d_top, d_bot, d_top_temp, d_bot_temp, m);
