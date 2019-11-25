@@ -13,7 +13,7 @@
 #include <algorithm>
 
 #include <cuda_runtime.h>
-#include <cusolverDn.h>
+//~ #include <cusolverDn.h>
 
 /* Time-keeping modules */
 #include <chrono>
@@ -24,17 +24,12 @@
 
 /* CUDA functions */
 #include "eigenFinder.h"
-#include "dsyevd_stream_functions.cuh"
-#include "dsyevj_stream_functions.cuh"
-//~ #include "geqrf_stream_functions.cuh"
-#include "dsyevj_batch_functions.cuh"
-#include "kernel_functions.cuh"
 
 /* MAGMA functions */
 //~ #include "magma_dsyev_batch_functions.cuh"
 
 /* Self-improvised QR algorithm */
-#include "QR_batch_function.cuh"
+//~ #include "QR_batch_function.cuh"
 
 /* Self-written Jacobi algorithm */
 #include "jacobi_kernel_function_new.cuh"
