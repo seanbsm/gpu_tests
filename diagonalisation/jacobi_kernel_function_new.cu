@@ -433,7 +433,7 @@ double jacobi_kernels_parallel(floatType *d_A, floatType *d_W, int m, int batchS
 			Jacobi_parallel_rot_shared<<<blocks, m, 2*m*sizeof(floatType)>>>(d_A, d_c, d_s, d_P, d_Q, m);
 			
 			//~ Jacobi_parallel_vec_rot<<<blocks, threads_vec>>>(d_V, d_c, d_s, d_P, d_Q, m);
-			//~ Jacobi_parallel_vec_rot_shared<<<blocks, m, 2*m*sizeof(floatType)>>>(d_V, d_c, d_s, d_P, d_Q, m);
+			Jacobi_parallel_vec_rot_shared<<<blocks, m, 2*m*sizeof(floatType)>>>(d_V, d_c, d_s, d_P, d_Q, m);
 			
 			rotational_sets_shared_mem<<<1, nThreads, m*sizeof(floatType)>>>(d_top, d_bot, d_P, d_Q, m);
 		}
