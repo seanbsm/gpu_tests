@@ -22,7 +22,7 @@ void fillSymmetricMatrix_full(double *A, int m){
 	for (int i=0; i<m; i++){
 		for (int j=0; j<m; j++){
 			//~ A[i + j*m] = (i + j*j) * sqrt((double)(i + j));
-			A[i + j*m]= (i + j) * sqrt(i + j) / 1e3;
+			A[i + j*m] = (i + j) * sqrt(i + j) / 1e3;
 		}
 	}
 }
