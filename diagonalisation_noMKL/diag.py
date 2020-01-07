@@ -212,22 +212,24 @@ eigVals_NP, eigVecs_NP = np.linalg.eigh(mat_NP)
 end = time.time()
 time_NP = end - start
 
+print eigVals_NP
+
 max_val = 0
 
-print "\n"
-for i in xrange(N):
+# ~ print "\n"
+# ~ for i in xrange(N):
 	
-	max_val_i = abs(eigVals_NP[i] - eigVals[i])
-	if max_val_i > max_val:
-		max_val = max_val_i
+	# ~ max_val_i = abs(eigVals_NP[i] - eigVals[i])
+	# ~ if max_val_i > max_val:
+		# ~ max_val = max_val_i
 	
 	# ~ print eigVals[i]
 	# ~ print eigVals_NP[i], "\n"
 	
 	# ~ print "\n",eigVecs[i]
 	# ~ print eigVecs_NP[i]
-print max_val
+# ~ print max_val
 
-print "\nTimes:" 
-print "My routine:", time_custom
-print "np routine:", time_NP
+# ~ print "\nTimes:" 
+# ~ print "My routine:", time_custom
+# ~ print "np routine:", time_NP
